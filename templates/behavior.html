@@ -71,10 +71,11 @@
 
     // Protocol Distribution Pie Chart
     var protocolDistData = [{
-      labels: {{ protocol_dist.keys()|list }},
-      values: {{ protocol_dist.values()|list }},
+      labels: {{ protocol_dist.keys()|list|tojson }},
+      values: {{ protocol_dist.values()|list|tojson }},
       type: 'pie'
     }];
+
     Plotly.newPlot('protocolDistChart', protocolDistData, {
       margin: {t: 30},
       plot_bgcolor: 'white',
