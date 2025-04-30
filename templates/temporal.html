@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Temporal Flow Analysis</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <nav>
+    <h2>NetFlow Monitor</h2>
+    <a href="/">Dashboard</a>
+    <a href="/performance">Performance Metrics</a>
+    <a href="/behavior">Behavioral Analytics</a>
+    <a href="/temporal">Temporal Analysis</a>
+    <a href="/ml-predictions">ML Anomaly Check</a>
+  </nav>
+
+  <main>
+    <h1>Temporal Flow Analysis</h1>
+
+    <div class="card">
+      <h3>Flows by Hour of Day</h3>
+      <div id="flowsByHourChart"></div>
+    </div>
+
+    <div class="card">
+      <h3>Flows by Day of Week</h3>
+      <div id="flowsByDayChart"></div>
+    </div>
+
+    <div class="card">
+      <h3>Heatmap: Flows (Day vs Hour)</h3>
+      <div id="heatmapChart"></div>
+    </div>
+
+  </main>
+
+  <script>
+    // Flows by Hour of Day
+    var flowsByHourData = [{
+      x: {{ flows_by_hour.keys()|list }},
+      y: {{ flows_by_hour.values()|list }},
+      type: 'bar',
+      marker: {color: '#4CAF50'}
+    }];
+    Plotly.newPlot('flowsByHourChart', flowsByHourData, {
+      margin: {t: 30},
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: {color: '#1c1c1c'},
+      xaxis: {title: "Hour of Day"},
+      yaxis: {title: "Number of Flows"}
+    });
+
+    // Flows by Day of Week
+    var flowsByDayData = [{
+      x: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      y: {{ flows_by_day.values()|list }},
+      type: 'bar',
+      marker: {color: '#2196F3'}
+    }];
+    Plotly.newPlot('flowsByDayChart', flowsByDayData, {
+      margin: {t: 30},
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: {color: '#1c1c1c'},
+      xaxis: {title: "Day of Week"},
+      yaxis: {title: "Number of Flows"}
+    });
+
+    // Heatmap Chart
+    var heatmapData = [{
+      z: {{ heatmap_data }},
+      x: {{ heatmap_hours }},
+      y: {{ heatmap_days }},
+      type: 'heatmap',
+      colorscale: 'Blues'
+    }];
+    Plotly.newPlot('heatmapChart', heatmapData, {
+      margin: {t: 30},
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: {color: '#1c1c1c'},
+      xaxis: {title: "Hour of Day"},
+      yaxis: {title: "Day of Week"}
+    });
+  </script>
+</body>
+</html>

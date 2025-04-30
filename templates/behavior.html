@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Behavioral Analytics</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <nav>
+    <h2>NetFlow Monitor</h2>
+    <a href="/">Dashboard</a>
+    <a href="/performance">Performance Metrics</a>
+    <a href="/behavior">Behavioral Analytics</a>
+    <a href="/temporal">Temporal Analysis</a>
+    <a href="/ml-predictions">ML Anomaly Check</a>
+  </nav>
+
+  <main>
+    <h1>Flow Behavior - Behavioral Analytics</h1>
+
+    <div class="card">
+      <h3>Top 10 Communication Pairs (Flow Recurrence)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Source IP → Destination IP</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for (src, dst), count in flow_recurrence.items() %}
+            <tr>
+              <td>{{ src }} → {{ dst }}</td>
+              <td>{{ count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Top 10 Destination Ports (Port Usage)</h3>
+      <div id="portUsageChart"></div>
+    </div>
+
+    <div class="card">
+      <h3>Protocol Distribution</h3>
+      <div id="protocolDistChart"></div>
+    </div>
+
+  </main>
+
+  <script>
+    // Port Usage Bar Chart
+    var portUsageData = [{
+      x: {{ port_usage.keys()|list }},
+      y: {{ port_usage.values()|list }},
+      type: 'bar',
+      marker: {color: '#2196F3'}
+    }];
+    Plotly.newPlot('portUsageChart', portUsageData, {
+      margin: {t: 30},
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: {color: '#1c1c1c'},
+      xaxis: {title: "Destination Port"},
+      yaxis: {title: "Number of Flows"}
+    });
+
+    // Protocol Distribution Pie Chart
+    var protocolDistData = [{
+      labels: {{ protocol_dist.keys()|list }},
+      values: {{ protocol_dist.values()|list }},
+      type: 'pie'
+    }];
+    Plotly.newPlot('protocolDistChart', protocolDistData, {
+      margin: {t: 30},
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: {color: '#1c1c1c'}
+    });
+  </script>
+</body>
+</html>

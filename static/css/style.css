@@ -1,0 +1,93 @@
+:root {
+  --bg: #f5f7fa;
+  --text: #1c1c1c;
+  --primary: #005fdd;
+  --accent: #0b84ff;
+  --card: #ffffff;
+  --border: #e0e0e0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  display: flex;
+}
+
+nav {
+  width: 240px;
+  background: #ffffff;
+  padding: 20px;
+  height: 100vh;
+  border-right: 1px solid var(--border);
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.05);
+}
+
+nav h2 {
+  font-size: 1.5em;
+  margin-bottom: 30px;
+  color: var(--primary);
+}
+
+nav a {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+  padding: 10px 0;
+  transition: all 0.2s;
+}
+
+nav a:hover {
+  color: var(--primary);
+}
+
+main {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+h1 {
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--primary);
+}
+
+h3 {
+  margin-top: 30px;
+  margin-bottom: 15px;
+  color: var(--accent);
+}
+
+.card {
+  background: var(--card);
+  padding: 20px;
+  margin-bottom: 25px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 14px;
+}
+
+th {
+  background-color: #f0f2f5;
+}
+
+#topTalkersChart, #flowCountChart, #bytesChart, #throughputChart, #packetsChart {
+  height: 250px;
+}

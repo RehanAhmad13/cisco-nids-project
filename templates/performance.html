@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Performance Metrics</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <nav>
+    <h2>NetFlow Monitor</h2>
+    <a href="/">Dashboard</a>
+    <a href="/performance">Performance Metrics</a>
+    <a href="/behavior">Behavioral Analytics</a>
+    <a href="/temporal">Temporal Analysis</a>
+    <a href="/ml-predictions">ML Anomaly Check</a>
+  </nav>
+
+  <main>
+    <h1>Flow Health - Performance Metrics</h1>
+
+    <div class="card">
+      <h3>Flow Duration Summary</h3>
+      <ul>
+        <li><strong>Average Flow Duration:</strong> {{ avg_duration | round(2) }} ms</li>
+        <li><strong>Minimum Flow Duration:</strong> {{ min_duration }} ms</li>
+        <li><strong>Maximum Flow Duration:</strong> {{ max_duration }} ms</li>
+        <li><strong>Std Dev of Flow Duration:</strong> {{ stddev_duration | round(2) }} ms</li>
+        <li><strong>Tiny Flows Percentage (&lt; 100 ms):</strong> {{ tiny_flows_percentage | round(2) }}%</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>TCP Flags Summary</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>TCP Flag Value</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for flag, count in tcp_flag_counts.items() %}
+            <tr>
+              <td>{{ flag }}</td>
+              <td>{{ count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Flow Duration Distribution</h3>
+      <div id="durationHistogram"></div>
+    </div>
+
+  </main>
+
+  <script>
+    var durations = {{ durations | safe }};
+    var trace = {
+      x: durations,
+      type: 'histogram',
+      marker: { color: '#4CAF50' }
+    };
+    Plotly.newPlot('durationHistogram', [trace], {
+      margin: { t: 30 },
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: { color: '#1c1c1c' },
+      xaxis: { title: 'Flow Duration (ms)' },
+      yaxis: { title: 'Count' }
+    });
+  </script>
+</body>
+</html>

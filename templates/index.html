@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Live NetFlow Monitoring</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  </head>
+  <body>
+    <nav>
+      <h2>NetFlow Monitor</h2>
+      <a href="/">Dashboard</a>
+      <a href="/performance">Performance Metrics</a>
+      <a href="/behavior">Behavioral Analytics</a>
+      <a href="/temporal">Temporal Analysis</a>
+      <a href="ml-predictions">ML Anomaly Check</a>
+    </nav>
+
+    <main>
+      <h1>Live NetFlow Monitoring</h1>
+
+      <div class="card">
+        <h3>In Bytes Over Time</h3>
+        <div id="bytesChart"></div>
+      </div>
+
+      <div class="card">
+        <h3>In Packets Over Time</h3>
+        <div id="packetsChart"></div>
+      </div>
+
+      <div class="card">
+        <h3>Avg Throughput (bps)</h3>
+        <div id="throughputChart"></div>
+      </div>
+
+      <div class="card">
+        <h3>Flow Count Per Minute</h3>
+        <div id="flowCountChart"></div>
+      </div>
+
+      <div class="card">
+        <h3>Top Talkers</h3>
+        <div id="topTalkersChart"></div>
+      </div>
+
+      <div class="card">
+        <h3> Latest Flows</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Src IP</th>
+              <th>Dst IP</th>
+              <th>Src Port</th>
+              <th>Dst Port</th>
+              <th>Protocol</th>
+              <th>TCP Flags</th>
+              <th>Bytes</th>
+              <th>Packets</th>
+              <th>Flow Duration (ms)</th>
+            </tr>
+          </thead>
+          <tbody id="flowTableBody"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>

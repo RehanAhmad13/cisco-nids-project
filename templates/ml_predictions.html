@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live ML Anomaly Detection</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+<nav>
+    <h2>NetFlow Monitor</h2>
+    <a href="/">Dashboard</a>
+    <a href="/performance">Performance Metrics</a>
+    <a href="/behavior">Behavioral Analytics</a>
+    <a href="/temporal">Temporal Analysis</a>
+    <a href="/ml-predictions"><b> Live ML Predictions</b></a> <!-- NEW -->
+</nav>
+
+<main>
+    <h1>Live ML Anomaly Detection</h1>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Src IP</th>
+                    <th>Dst IP</th>
+                    <th>Src Port</th>
+                    <th>Dst Port</th>
+                    <th>Protocol</th>
+                    <th>TCP Flags</th>
+                    <th>Bytes</th>
+                    <th>Packets</th>
+                    <th>Duration (ms)</th>
+                    <th><b>Prediction</b></th>
+                </tr>
+            </thead>
+            <tbody id="mlFlowTableBody"></tbody>
+        </table>
+    </div>
+</main>
+
+<script>
+async function fetchMLPredictions() {
+    try {
+        const res = await fetch('/flows_with_predictions');
+        const data = await res.json();
+
+        const tbody = document.getElementById("mlFlowTableBody");
+        tbody.innerHTML = "";
+
+        data.forEach(d => {
+            const row = document.createElement("tr");
+            const displayTime = new Date(d.time).toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false
+            });
+
+            row.innerHTML = `
+                <td>${displayTime}</td>
+                <td>${d.ipv4_src_addr ?? '—'}</td>
+                <td>${d.ipv4_dst_addr ?? '—'}</td>
+                <td>${d.l4_src_port ?? '—'}</td>
+                <td>${d.l4_dst_port ?? '—'}</td>
+                <td>${d.protocol ?? '—'}</td>
+                <td>${d.tcp_flags ?? '—'}</td>
+                <td>${d.in_bytes ?? '—'}</td>
+                <td>${d.in_pkts ?? '—'}</td>
+                <td>${d.flow_duration_ms ?? '—'}</td>
+                <td><b>${d.prediction}</b></td>
+            `;
+
+            // Highlight malicious flows
+            if (d.prediction === "Malicious") {
+                row.style.backgroundColor = "#ffd1d1"; // Light red
+            }
+
+            tbody.appendChild(row);
+        });
+
+    } catch (err) {
+        console.error("Error fetching /flows_with_predictions:", err);
+    }
+}
+
+fetchMLPredictions();
+setInterval(fetchMLPredictions, 60000); // Refresh every 60 seconds
+</script>
+
+</body>
+</html>
