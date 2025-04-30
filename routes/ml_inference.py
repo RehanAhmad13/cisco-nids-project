@@ -64,40 +64,57 @@ def preprocess_row(row):
     ]
     return features
 
-# === Route: Predict on last 100 flows ===
+
 @ml_bp.route("/flows_with_predictions", methods=["GET"])
 def flows_with_predictions():
-    # Query last 100 flows
-    query = """
-    SELECT ipv4_src_addr, ipv4_dst_addr, l4_src_port, l4_dst_port,
-           protocol, tcp_flags, in_bytes, in_pkts,
-           flow_duration_ms, bytes_per_second, avg_throughput_bps,
-           time
-    FROM network_flows
-    ORDER BY time DESC
-    LIMIT 100;
-    """
-    df = pd.read_sql(query, engine)
+    try:
+        query = """
+        SELECT ipv4_src_addr, ipv4_dst_addr, l4_src_port, l4_dst_port,
+               protocol, tcp_flags, in_bytes, in_pkts,
+               flow_duration_ms, bytes_per_second, avg_throughput_bps,
+               time
+        FROM network_flows
+        ORDER BY time DESC
+        LIMIT 100;
+        """
+        df = pd.read_sql(query, engine)
 
-    # Preprocess each row
-    X_list = df.apply(preprocess_row, axis=1).tolist()
+        if df.empty:
+            return jsonify([])
 
-    # Create a DataFrame with correct feature names
-    X_df = pd.DataFrame(X_list, columns=FEATURES)
+        # Preprocess features for ML model
+        X_list = df.apply(preprocess_row, axis=1).tolist()
 
-    # Turn it into DMatrix for Booster
-    dmatrix = xgb.DMatrix(X_df, feature_names=X_df.columns.tolist())
+        # Raw feature column names (from database)
+        raw_columns = [
+            "ipv4_src_addr", "ipv4_dst_addr", "l4_src_port", "l4_dst_port",
+            "protocol", "tcp_flags", "in_bytes", "in_pkts",
+            "flow_duration_ms", "bytes_per_second", "avg_throughput_bps"
+        ]
 
-    # Make predictions
-    preds = model.predict(dmatrix)
+        # Rename columns to match the model's training feature names exactly
+        model_features = [
+            "IPV4_SRC_ADDR", "IPV4_DST_ADDR", "L4_SRC_PORT", "L4_DST_PORT",
+            "PROTOCOL", "TCP_FLAGS", "IN_BYTES", "IN_PKTS",
+            "FLOW_DURATION_MILLISECONDS", "SRC_TO_DST_SECOND_BYTES", "SRC_TO_DST_AVG_THROUGHPUT"
+        ]
 
-    # Attach predictions back
-    df["prediction"] = ["Malicious" if p >= 0.5 else "Benign" for p in preds]
+        X_df = pd.DataFrame(X_list, columns=raw_columns)
+        X_df.columns = model_features  # Rename to match training data
 
-    # Convert to list of dicts for JSON
-    results = df.to_dict(orient="records")
+        dmatrix = xgb.DMatrix(X_df, feature_names=model_features)
+        preds = model.predict(dmatrix)
 
-    return jsonify(results)
+        df["prediction"] = ["Malicious" if p >= 0.5 else "Benign" for p in preds]
+        df = df.replace({float('nan'): None})
+
+        records = df.to_dict(orient="records")
+        return jsonify(records)
+
+    except Exception as e:
+        print("Error in /flows_with_predictions:", e)
+        return jsonify([])
+
 
 # === Route: ML Predictions Page ===
 @ml_bp.route("/ml-predictions", methods=["GET"])

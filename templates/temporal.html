@@ -40,8 +40,8 @@
   <script>
     // Flows by Hour of Day
     var flowsByHourData = [{
-      x: {{ flows_by_hour.keys()|list }},
-      y: {{ flows_by_hour.values()|list }},
+      x: {{ flows_by_hour.keys()|list|tojson }},
+      y: {{ flows_by_hour.values()|list|tojson }},
       type: 'bar',
       marker: {color: '#4CAF50'}
     }];
@@ -53,11 +53,11 @@
       xaxis: {title: "Hour of Day"},
       yaxis: {title: "Number of Flows"}
     });
-
+  
     // Flows by Day of Week
     var flowsByDayData = [{
       x: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      y: {{ flows_by_day.values()|list }},
+      y: {{ flows_by_day.values()|list|tojson }},
       type: 'bar',
       marker: {color: '#2196F3'}
     }];
@@ -69,12 +69,12 @@
       xaxis: {title: "Day of Week"},
       yaxis: {title: "Number of Flows"}
     });
-
+  
     // Heatmap Chart
     var heatmapData = [{
-      z: {{ heatmap_data }},
-      x: {{ heatmap_hours }},
-      y: {{ heatmap_days }},
+      z: {{ heatmap_data|tojson }},
+      x: {{ heatmap_hours|tojson }},
+      y: {{ heatmap_days|tojson }},
       type: 'heatmap',
       colorscale: 'Blues'
     }];
@@ -86,6 +86,6 @@
       xaxis: {title: "Hour of Day"},
       yaxis: {title: "Day of Week"}
     });
-  </script>
+  </script>  
 </body>
 </html>
