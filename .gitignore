@@ -7,3 +7,10 @@ __pycache__/
 
 # Data files
 *.csv
+*.pkl
+*.json
+*.zip
+*.csv
+*.pkl
+*.json
+*.zip
