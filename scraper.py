@@ -237,7 +237,7 @@ if __name__ == "__main__":
                 print("Extracted features:")
                 print(df.head().to_string(index=False))
 
-                print("\Writing to TimescaleDB and CSV...")
+                print("Writing to TimescaleDB and CSV...")
                 write_to_csv(df)
                 write_to_timescaledb(df, tsdb_engine)
 
