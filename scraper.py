@@ -1,252 +1,191 @@
 import re
 import os
+import time
 import datetime as dt
 from typing import List, Tuple, Dict
 
 import pandas as pd
+import pytz
 from netmiko import ConnectHandler
 from sqlalchemy import create_engine
-import pytz
-import time
-
 
 # ======================================
-# SSH Connection Helper Function 
+# Configuration
 # ======================================
-def connect_device(host, username, password, device_type="cisco_ios", **extra_settings):
-    connection_settings = {
-        "host": host,
-        "username": username,
-        "password": password,
-        "device_type": device_type,
-        "fast_cli": True,
-        "session_timeout": 30,
-        "banner_timeout": 30,
-        "auth_timeout": 20,
-        **extra_settings
-    }
-    return ConnectHandler(**connection_settings)
-
-
-# ======================================
-# Flow Parsing Helpers
-# ======================================
-
-
-#_COL_SPLIT is  a regular expresson. If the router gives an output: 
-# "IPV4 SRC ADDR  IPV4 DST ADDR  TRNS SRC PORT"
-# _COL_SPLIT will split it into: 
-#    ["ipv4_src_addr", "ipv4_dst_addr", "trns_src_port"]
-
-_COL_SPLIT = re.compile(r"\s{2,}")  # two or more spaces
-
-
-
-
-#The following dictionary maps the column names from the Cisco 
-#IOS output to the column names used in the NIDS (Network Intrusion 
-#Detection System) database.
-
-
-IOS2NIDS = {
-    "IPV4 SRC ADDR": "IPV4_SRC_ADDR",
-    "IPV4 DST ADDR": "IPV4_DST_ADDR",
-    "TRNS SRC PORT": "L4_SRC_PORT",
-    "TRNS DST PORT": "L4_DST_PORT",
-    "IP PROT":       "PROTOCOL",
-    "tcp flags":     "TCP_FLAGS",
-    "bytes long":    "IN_BYTES",
-    "pkts long":     "IN_PKTS",
-    "APP NAME":      "L7_PROTO",  # optional
+DEVICE = {
+    'device_type': 'cisco_ios',
+    'host': '192.168.10.14',
+    'username': 'usama',
+    'password': 'usama',
 }
 
+MAIN_MONITOR = "FLOW-MONITOR"
+FLAG_MONITOR = "dat_Gi1_885011376"
 
-def _parse_header(lines: List[str]) -> Tuple[int, List[str]]:
-    for idx, ln in enumerate(lines):
-        if "IPV4 SRC ADDR" in ln and "IPV4 DST ADDR" in ln:
-            cols = _COL_SPLIT.split(ln.strip())
-            return idx, cols
-    raise ValueError("Flexible NetFlow header not found")
-
-
-
-### This is our main parser function. It starts reading after the 
-### head line. Skips blank lines and then splits the line into parts.
-### Create a dictionary for each flow. For example, 
-### [ {'IPV4 SRC ADDR': '192.168.1.1',
-#      'IPV4 DST ADDR': '8.8.8.8',
-#      'TRNS SRC PORT': '12345',
-#      .... 
-#     } 
-#
-#     {
-#      ....
-#     }
-#  ]
-
-def _parse_flow_lines(lines: List[str], start_idx: int, headers: List[str]) -> List[Dict[str, str]]:
-    data = []
-    for ln in lines[start_idx+2:]:
-        if not ln.strip():
-            break
-        parts = _COL_SPLIT.split(ln.rstrip())
-        if len(parts) != len(headers):
-            continue
-        data.append(dict(zip(headers, parts)))
-    return data
+TSDB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/network_db"
+TSDB_ENGINE = create_engine(TSDB_URL)
+CSV_FILE = "flows_log.csv"
 
 # ======================================
-# NetFlow Fetch + DataFrame Build
+# Helpers & Constants
 # ======================================
-def fetch_monitor_cache(conn: ConnectHandler, monitor: str) -> pd.DataFrame:
-    
-    ## This function fetches the flow monitor cache from the router.
-    raw = conn.send_command(f"show flow monitor {monitor} cache", use_textfsm=False)
-    ### Split the output into lines
+_SPLIT = re.compile(r"\s{2,}")  # split on 2+ spaces
+IF_MAP = {"Gi1": 1, "Gi2": 2, "Gi3": 3, "Null": 0}
+DUBAI_TZ = pytz.timezone("Asia/Dubai")
+
+def compute_direction(ing: int, egr: int) -> str:
+    if ing == 0 and egr in (1,2,3):           return 'local-origin'
+    if ing in (1,2) and egr == 3:            return 'outbound'
+    if ing == 3 and egr in (1,2):            return 'inbound'
+    if ing in (1,2) and egr in (1,2) and ing != egr:
+        return 'lateral'
+    if egr == 0:                             return 'dropped'
+    return 'unknown'
+
+def parse_header_and_rows(raw: str) -> Tuple[List[str], List[Dict[str,str]]]:
     lines = raw.splitlines()
-    ### Find the header line and its index. Splits into a list of columns
-    hdr_idx, hdr_cols = _parse_header(lines)
-    ### This parses the flow lines and creates a list of dictionaries
-    rows = _parse_flow_lines(lines, hdr_idx, hdr_cols)
+    for idx, ln in enumerate(lines):
+        if "IPV4 SRC ADDR" in ln:
+            start = ln.index("IPV4 SRC ADDR")
+            hdrs = [
+                h.lower().replace(" ", "_")
+                for h in _SPLIT.split(ln[start:].strip())
+            ]
+            rows = []
+            for ln2 in lines[idx+2:]:
+                part = ln2[start:].rstrip()
+                if not part:
+                    break
+                parts = _SPLIT.split(part)
+                if len(parts) == len(hdrs):
+                    rows.append(dict(zip(hdrs, parts)))
+            return hdrs, rows
+    raise RuntimeError("Header not found in flow output")
 
-    if not rows:
-        return pd.DataFrame()
+def write_to_csv(df: pd.DataFrame, filename: str=CSV_FILE):
+    header = not os.path.isfile(filename)
+    df.to_csv(filename, mode='a', header=header, index=False)
 
-    ### We create a dataframe. The columns are renamed according to the IOS2NIDS mapping.
-    df = pd.DataFrame(rows).rename(columns=IOS2NIDS)
-
-    ### Convert columns to numeric types from strings. 
-    for col in ("IN_BYTES", "IN_PKTS", "L4_SRC_PORT", "L4_DST_PORT"):
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # Convert hex to integer
-    if "TCP_FLAGS" in df.columns:
-        df["TCP_FLAGS"] = df["TCP_FLAGS"].apply(
-            lambda x: int(x, 16) if isinstance(x, str) and x.startswith("0x") else pd.NA
-        )
-
-    # Check if both 'time first' and 'time last' columns exist in the DataFrame
-    if {"time first", "time last"}.issubset(df.columns):
-
-        # Get today's date in 'YYYY-MM-DD' format (e.g., '2025-04-27')
-        today = dt.date.today().isoformat()
-
-        # Combine today's date with the 'time first' column to make a full timestamp
-        # Example: '2025-04-27 10:30:15'
-        first = pd.to_datetime(today + " " + df["time first"])
-
-        # Similarly, combine today's date with the 'time last' column
-        last = pd.to_datetime(today + " " + df["time last"])
-
-        # Handle flows that cross midnight:
-        # If the 'last' timestamp is earlier than 'first' (flow crossed into next day),
-        # add 1 day to the 'last' timestamp to correct it
-        last = last.where(last >= first, last + pd.Timedelta(days=1))
-
-        # Define the Dubai timezone
-        dubai_tz = pytz.timezone("Asia/Dubai")
-
-        # First assume timestamps are in UTC, then convert them to Dubai local time
-        df["time_first"] = first.dt.tz_localize("UTC").dt.tz_convert(dubai_tz)
-        df["time_last"]  = last.dt.tz_localize("UTC").dt.tz_convert(dubai_tz)
-
-        # Calculate flow duration in milliseconds
-        # (time_last - time_first) gives timedelta → convert to seconds → multiply by 1000 to get milliseconds
-        df["FLOW_DURATION_MILLISECONDS"] = (last - first).dt.total_seconds() * 1000
-
-        # Also calculate duration in seconds for later use
-        dur_sec = df["FLOW_DURATION_MILLISECONDS"] / 1000.0
-
-        # Calculate bytes transferred per second
-        # (Total bytes) / (Duration in seconds), avoiding division by 0
-        df["SRC_TO_DST_SECOND_BYTES"] = df["IN_BYTES"] / dur_sec.replace(0, pd.NA)
-
-        # Calculate average throughput (in bits per second)
-        # 8 bits per byte × (Total bytes) / (Duration in seconds)
-        df["SRC_TO_DST_AVG_THROUGHPUT"] = 8 * df["IN_BYTES"] / dur_sec.replace(0, pd.NA)
-
-        # Set the scrape timestamp as the 'time_last' value (when flow ended)
-        df["SCRAPE_TIMESTAMP"] = df["time_last"]
-
-    else:
-        # If 'time first' and 'time last' columns are missing,
-        # fall back to setting scrape timestamp as the current time (Dubai timezone)
-        df["SCRAPE_TIMESTAMP"] = pd.Timestamp.now(tz=pytz.timezone("Asia/Dubai"))
-
-    # Always add the monitor name (like "FLOW-MONITOR") into a new column
-    df["FLOW_MONITOR"] = monitor
-
-    return df
-
-
-def scrape_all_monitors(conn: ConnectHandler, monitors: List[str]) -> pd.DataFrame:
-    frames = [fetch_monitor_cache(conn, m) for m in monitors]
-    return pd.concat(frames, ignore_index=True)
-
-# ======================================
-# Writers: TimescaleDB & CSV
-# ======================================
 def write_to_timescaledb(df: pd.DataFrame, engine):
-    # Drop unused Cisco-style columns if they exist
-    df = df.drop(columns=["time first", "time last"], errors="ignore")
-
-    df = df.rename(columns={
-        "IPV4_SRC_ADDR": "ipv4_src_addr",
-        "IPV4_DST_ADDR": "ipv4_dst_addr",
-        "L4_SRC_PORT": "l4_src_port",
-        "L4_DST_PORT": "l4_dst_port",
-        "PROTOCOL": "protocol",
-        "TCP_FLAGS": "tcp_flags",
-        "IN_BYTES": "in_bytes",
-        "IN_PKTS": "in_pkts",
-        "FLOW_DURATION_MILLISECONDS": "flow_duration_ms",
-        "SRC_TO_DST_SECOND_BYTES": "bytes_per_second",
-        "SRC_TO_DST_AVG_THROUGHPUT": "avg_throughput_bps",
-        "FLOW_MONITOR": "flow_monitor",
-        "SCRAPE_TIMESTAMP": "time"
-    })
-
     df.to_sql("network_flows", con=engine, if_exists="append", index=False, method="multi")
 
-def write_to_csv(df: pd.DataFrame, filename="flows_log.csv"):
-    file_exists = os.path.isfile(filename)
-    df.to_csv(filename, mode='a', header=not file_exists, index=False)
-
 # ======================================
-# Main: Scrape & Log
+# Main loop
 # ======================================
-
 if __name__ == "__main__":
-    host     = "192.168.10.14"
-    username = "usama"
-    password = "usama"
-    monitors = ["FLOW-MONITOR", "dat_Gi1_885011376"]
-
-    tsdb_url = "postgresql+psycopg2://postgres:postgres@localhost:5432/network_db"
-    tsdb_engine = create_engine(tsdb_url)
-
     while True:
-        print("Connecting to router...")
         try:
-            conn = connect_device(host, username, password)
-            df = scrape_all_monitors(conn, monitors)
+            # 1) SSH & fetch both caches
+            conn = ConnectHandler(**DEVICE)
+            main_raw = conn.send_command(f"show flow monitor {MAIN_MONITOR} cache", use_textfsm=False)
+            flag_raw = conn.send_command(f"show flow monitor {FLAG_MONITOR} cache", use_textfsm=False)
             conn.disconnect()
 
+            # 2) Parse into DataFrames
+            hdr_main, rows_main = parse_header_and_rows(main_raw)
+            hdr_flag, rows_flag = parse_header_and_rows(flag_raw)
+            df_main = pd.DataFrame(rows_main)
+            df_flag = pd.DataFrame(rows_flag)
+
+            # 3) Normalize column names
+            common_rename = {
+                "ipv4_src_addr":"ipv4_src_addr",
+                "ipv4_dst_addr":"ipv4_dst_addr",
+                "trns_src_port":"l4_src_port",
+                "trns_dst_port":"l4_dst_port",
+                "ip_prot":"protocol"
+            }
+            df_main = df_main.rename(columns=common_rename)
+            df_flag = df_flag.rename(columns={**common_rename, "tcp_flags":"tcp_flags"})
+
+            # 4) Ensure key columns exist and cast
+            for df in (df_main, df_flag):
+                for col in ("ipv4_src_addr","ipv4_dst_addr","l4_src_port","l4_dst_port","protocol"):
+                    if col not in df.columns:
+                        df[col] = pd.NA
+                df["l4_src_port"] = pd.to_numeric(df["l4_src_port"], errors="coerce")
+                df["l4_dst_port"] = pd.to_numeric(df["l4_dst_port"], errors="coerce")
+                df["protocol"]    = pd.to_numeric(df["protocol"],    errors="coerce")
+
+            # 5) Merge tcp_flags from flag monitor
+            merge_keys = ["ipv4_src_addr","ipv4_dst_addr","l4_src_port","l4_dst_port","protocol"]
+            df = pd.merge(
+                df_main,
+                df_flag[merge_keys + ["tcp_flags"]],
+                on=merge_keys,
+                how="left"
+            )
+
+            # 6) Rename raw cols and ensure full set
+            col_map = {
+                "bytes":"in_bytes","pkts":"in_pkts",
+                "app_name":"application_name",
+                "intf_input":"intf_input","intf_output":"intf_output",
+                "time_first":"time_first","time_last":"time_last",
+                "tcp_flags":"tcp_flags"
+            }
+            df = df.rename(columns=col_map)
+            for c in col_map.values():
+                if c not in df.columns:
+                    df[c] = pd.NA
+
+            # 7) Cast bytes/packets and tcp_flags
+            df["in_bytes"] = pd.to_numeric(df["in_bytes"], errors="coerce")
+            df["in_pkts"]  = pd.to_numeric(df["in_pkts"],  errors="coerce")
+            df["tcp_flags"] = df["tcp_flags"].apply(
+                lambda x: int(x,16) if isinstance(x,str) and x.startswith("0x") else pd.NA
+            )
+
+            # 8) Timestamps, durations & rates
+            today = dt.date.today().isoformat()
+            first = pd.to_datetime(today + " " + df["time_first"])
+            last  = pd.to_datetime(today + " " + df["time_last"])
+            last  = last.where(last>=first, last + pd.Timedelta(days=1))
+            df["time_first"]       = first.dt.tz_localize("UTC").dt.tz_convert(DUBAI_TZ)
+            df["time_last"]        = last.dt.tz_localize("UTC").dt.tz_convert(DUBAI_TZ)
+            df["flow_duration_ms"] = (last - first).dt.total_seconds() * 1000
+
+            df["dur_s"] = df["flow_duration_ms"] / 1000.0
+            zero_dur    = df["flow_duration_ms"] == 0
+            df.loc[zero_dur, ["bytes_per_second","avg_throughput_bps"]] = 0.0
+            nonzero     = ~zero_dur
+            df.loc[nonzero, "bytes_per_second"]   = df.loc[nonzero, "in_bytes"]    / df.loc[nonzero, "dur_s"]
+            df.loc[nonzero, "avg_throughput_bps"] = df.loc[nonzero, "in_bytes"] * 8  / df.loc[nonzero, "dur_s"]
+            df.drop(columns=["dur_s"], inplace=True)
+
+            # 9) Scrape timestamp
+            df["scrape_time"] = df["time_last"]
+
+            # 10) Interfaces & direction
+            df["ingress_if"] = df["intf_input"].map(IF_MAP).fillna(0).astype(int)
+            df["egress_if"]  = df["intf_output"].map(IF_MAP).fillna(0).astype(int)
+            df["direction"]  = df.apply(lambda r: compute_direction(r.ingress_if, r.egress_if), axis=1)
+
+            # 11) Tag monitor and rename for TimescaleDB
+            df["flow_monitor"] = MAIN_MONITOR
+            df = df.rename(columns={"scrape_time": "time"})
+
+            # 12) Select final columns
+            final_cols = [
+                "ipv4_src_addr","ipv4_dst_addr","l4_src_port","l4_dst_port",
+                "protocol","tcp_flags","in_bytes","in_pkts",
+                "flow_duration_ms","bytes_per_second","avg_throughput_bps",
+                "application_name","ingress_if","egress_if","direction",
+                "flow_monitor","time","time_first","time_last"
+            ]
+            df = df[final_cols]
+
+            # 13) Output & write
             if not df.empty:
-                print("Extracted features:")
+                print(f"Extracted {len(df)} flows, sample:")
                 print(df.head().to_string(index=False))
-
-                print("Writing to TimescaleDB and CSV...")
                 write_to_csv(df)
-                write_to_timescaledb(df, tsdb_engine)
-
-                print(f"Logged {len(df)} flows.")
+                write_to_timescaledb(df, TSDB_ENGINE)
             else:
-                print("No flows found.")
+                print("No flows found in this iteration.")
 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error during scrape: {e}")
 
-        print("Sleeping for 1 minutes...\n")
-        time.sleep(60)  # 1 minutes
+        print("Sleeping for 60 seconds...\n")
+        time.sleep(60)

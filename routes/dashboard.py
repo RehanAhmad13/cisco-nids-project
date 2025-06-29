@@ -18,22 +18,40 @@ def dashboard():
 # -------------------
 def get_data():
     df = pd.read_sql("""
-        SELECT time, time_first, time_last,
-               ipv4_src_addr, ipv4_dst_addr,
-               l4_src_port, l4_dst_port,
-               protocol, tcp_flags,
-               in_bytes, in_pkts,
-               flow_duration_ms, bytes_per_second,
-               avg_throughput_bps, flow_monitor
+        SELECT 
+            time              AS scrape_time,
+            time_first,
+            time_last,
+            ipv4_src_addr,
+            ipv4_dst_addr,
+            l4_src_port,
+            l4_dst_port,
+            protocol,
+            tcp_flags,
+            in_bytes,
+            in_pkts,
+            flow_duration_ms,
+            bytes_per_second,
+            avg_throughput_bps,
+            flow_monitor,
+            application_name,
+            ingress_if,
+            egress_if,
+            direction
         FROM network_flows
-        WHERE time_first > NOW() - interval '5 minutes'
+        WHERE time_first > NOW() - INTERVAL '5 minutes'
         ORDER BY time_first DESC
         LIMIT 1000
     """, engine)
 
     dubai_tz = pytz.timezone("Asia/Dubai")
-    for col in ["time", "time_first", "time_last"]:
-        df[col] = pd.to_datetime(df[col]).dt.tz_convert(dubai_tz).astype(str)
+    # normalize all timestamp columns to strings in local TZ
+    for col in ["scrape_time", "time_first", "time_last"]:
+        df[col] = (
+            pd.to_datetime(df[col])
+              .dt.tz_convert(dubai_tz)
+              .astype(str)
+        )
 
     return df
 
@@ -44,14 +62,13 @@ def get_data():
 def data():
     try:
         df = get_data()
-        return jsonify(df.replace({float('nan'): None}).to_dict(orient="records"))
+        # convert NaNs to nulls for JSON
+        payload = df.where(pd.notnull(df), None).to_dict(orient="records")
+        return jsonify(payload)
     except Exception as e:
-        print("Error in /data:", e)
+        app.logger.exception("Error in /data")
         return jsonify({"error": str(e)}), 500
 
-# -------------------
-# API: Return metrics data
-# -------------------
 
 """
 This API aggregates flow data into 5 key metrics:
@@ -102,3 +119,43 @@ def metrics():
     except Exception as e:
         print("Error in /metrics:", e)
         return jsonify({"error": str(e)}), 500
+
+
+# -------------------
+# API: Bytes by direction (last 15 minutes, 30s buckets)
+# -------------------
+@dashboard_bp.route("/bytes_by_direction")
+def bytes_by_direction():
+    q = """
+    SELECT
+      time_bucket('30 seconds', time_first) AT TIME ZONE 'Asia/Dubai' AS ts,
+      direction,
+      SUM(in_bytes) AS bytes
+    FROM network_flows
+    WHERE time_first > NOW() - INTERVAL '15 minutes'
+    GROUP BY 1,2
+    ORDER BY 1;
+    """
+    df = pd.read_sql(q, engine)
+    df["ts"] = pd.to_datetime(df["ts"]).dt.strftime("%Y-%m-%dT%H:%M:%S")
+    return jsonify(df.to_dict(orient="records"))
+
+
+# -------------------
+# API: Bytes by interface (last 15 minutes, 30s buckets)
+# -------------------
+@dashboard_bp.route("/bytes_by_interface")
+def bytes_by_interface():
+    q = """
+    SELECT
+      time_bucket('30 seconds', time_first) AT TIME ZONE 'Asia/Dubai' AS ts,
+      ingress_if,
+      SUM(in_bytes) AS bytes
+    FROM network_flows
+    WHERE time_first > NOW() - INTERVAL '15 minutes'
+    GROUP BY 1,2
+    ORDER BY 1,2;
+    """
+    df = pd.read_sql(q, engine)
+    df["ts"] = pd.to_datetime(df["ts"]).dt.strftime("%Y-%m-%dT%H:%M:%S")
+    return jsonify(df.to_dict(orient="records"))

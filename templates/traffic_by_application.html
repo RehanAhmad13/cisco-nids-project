@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Traffic by Application</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <nav>
+    <h2>NetFlow Monitor</h2>
+    <a href="/">Dashboard</a>
+    <a href="/performance">Performance Metrics</a>
+    <a href="/behavior">Behavioral Analytics</a>
+    <a href="/temporal">Temporal Analysis</a>
+    <a href="/ml-predictions">ML Anomaly Check</a>
+    <a href="/traffic_by_application"><b>Traffic by Application</b></a>
+  </nav>
+
+  <main>
+    <h1>Traffic by Application</h1>
+
+    <!-- 1) Line chart with dropdown -->
+    <div class="card">
+      <h3>Application Traffic Over Time</h3>
+      <div id="appLineChart" style="height: 500px;"></div>
+    </div>
+
+    <!-- 2) Top 8 bar chart -->
+    <div class="card">
+      <h3>Top 8 Applications (Total Bytes, last 1 hr)</h3>
+      <div id="topAppsBar" style="height: 400px;"></div>
+    </div>
+
+    <!-- 3) Heatmap -->
+    <div class="card">
+      <h3>App Usage Heatmap</h3>
+      <div id="appHeatmap" style="height: 600px;"></div>
+    </div>
+  </main>
+
+  <script>
+    async function drawAppTraffic() {
+      const res  = await fetch('/api/traffic_by_application');
+      const data = await res.json();
+
+      // filter out null/empty app names
+      const filtered = data.filter(d =>
+        d.application_name && d.application_name.trim()
+      );
+
+      // sorted unique apps & intervals
+      const apps      = Array.from(new Set(filtered.map(d => d.application_name))).sort();
+      const intervals = Array.from(new Set(filtered.map(d => d.interval_start))).sort();
+
+      // --- build time-series traces ---
+      const traces = apps.map(app => {
+        const y = intervals.map(ts => {
+          const rec = filtered.find(d =>
+            d.interval_start === ts && d.application_name === app
+          );
+          return rec ? rec.total_bytes : 0;
+        });
+        return {
+          x: intervals,
+          y,
+          name: app,
+          mode: 'lines+markers',
+          type: 'scatter',
+          visible: false
+        };
+      });
+      // show first N (or all) initially
+      traces.forEach((t,i)=>{ if(i<3) t.visible = true; });
+
+      // dropdown buttons
+      const buttons = apps.map((app, i) => ({
+        method: 'update',
+        label: app,
+        args: [{
+          visible: apps.map((_, j) => j === i)
+        }]
+      }));
+      buttons.push({
+        method: 'update',
+        label: 'All',
+        args: [{ visible: apps.map(_=>true) }]
+      });
+
+      const layoutLine = {
+        title: 'Application Traffic Over Time',
+        xaxis: { title: 'Time', type: 'date', tickangle: -45 },
+        yaxis: { title: 'Total Bytes', rangemode: 'tozero' },
+        updatemenus: [{ x: 0, y: 1.2, buttons }],
+        margin: { t:50, l:60, r:30, b:100 },
+        legend: { orientation: 'h' }
+      };
+
+      Plotly.newPlot('appLineChart', traces, layoutLine, {responsive: true});
+
+
+      // --- Top 8 bar chart ---
+      // compute total bytes per app
+      const totalByApp = apps.map(app => ({
+        app,
+        total: filtered
+          .filter(d => d.application_name === app)
+          .reduce((sum, d) => sum + d.total_bytes, 0)
+      }));
+      const top8 = totalByApp
+        .sort((a,b)=>b.total - a.total)
+        .slice(0,8);
+
+      const barData = [{
+        x: top8.map(t=>t.total).reverse(),
+        y: top8.map(t=>t.app).reverse(),
+        type: 'bar',
+        orientation: 'h'
+      }];
+      const layoutBar = {
+        margin:{l:150, t:30, b:50},
+        xaxis:{title:'Total Bytes'},
+        yaxis:{title:'Application'}
+      };
+      Plotly.newPlot('topAppsBar', barData, layoutBar, {responsive: true});
+
+
+      // --- Heatmap ---
+      const z = apps.map(app =>
+        intervals.map(ts => {
+          const rec = filtered.find(d =>
+            d.interval_start === ts && d.application_name === app
+          );
+          return rec ? rec.total_bytes : 0;
+        })
+      );
+
+      const heatData = [{
+        z,
+        x: intervals,
+        y: apps,
+        type: 'heatmap',
+        colorscale: 'YlOrRd'
+      }];
+      const layoutHeat = {
+        margin:{l:150, t:30, b:100},
+        xaxis:{title:'Time', type:'date', tickangle:-45},
+        yaxis:{title:'Application'}
+      };
+      Plotly.newPlot('appHeatmap', heatData, layoutHeat, {responsive: true});
+    }
+
+    document.addEventListener('DOMContentLoaded', drawAppTraffic);
+  </script>
+</body>
+</html>
