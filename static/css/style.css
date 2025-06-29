@@ -11,17 +11,20 @@
   box-sizing: border-box;
 }
 
+/* ───────────────────────────────────────────────────
+   GLOBAL DASHBOARD LAYOUT (sidebar nav + main content)
+──────────────────────────────────────────────────── */
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
   background-color: var(--bg);
   color: var(--text);
-  display: flex;
+  display: flex;            /* sidebar + content */
 }
 
 nav {
   width: 240px;
-  background: #ffffff;
+  background: var(--card);
   padding: 20px;
   height: 100vh;
   border-right: 1px solid var(--border);
@@ -41,7 +44,6 @@ nav a {
   padding: 10px 0;
   transition: all 0.2s;
 }
-
 nav a:hover {
   color: var(--primary);
 }
@@ -88,6 +90,99 @@ th {
   background-color: #f0f2f5;
 }
 
-#topTalkersChart, #flowCountChart, #bytesChart, #throughputChart, #packetsChart {
+/* chart containers */
+#topTalkersChart,
+#flowCountChart,
+#bytesChart,
+#throughputChart,
+#packetsChart {
   height: 250px;
+}
+
+/* ───────────────────────────────────────────────────
+   GEO-IP MAP OVERRIDES (top nav + map|controls layout)
+   –– To activate, add `class="geomap"` on your <body> tag in geomap.html
+──────────────────────────────────────────────────── */
+body.geomap {
+  display: flex;
+  flex-direction: column;   /* stack nav on top of main */
+  height: 100vh;            /* let main fill under nav */
+  background-color: var(--bg);
+}
+
+body.geomap nav {
+  width: 100%;
+  height: auto;
+  background: #2c3e50;
+  color: #ecf0f1;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-right: none;
+  box-shadow: none;
+}
+
+body.geomap nav h1,
+body.geomap nav h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #ecf0f1;
+}
+
+body.geomap nav a {
+  color: #ecf0f1;
+  text-decoration: none;
+}
+
+body.geomap nav a.active {
+  font-weight: bold;
+}
+
+body.geomap main {
+  display: flex;            /* two columns: #map | #controls */
+  flex: 1;
+  overflow: hidden;
+}
+
+body.geomap #map {
+  flex: 1;
+}
+
+body.geomap #controls {
+  width: 300px;
+  padding: 1rem;
+  background: #f7f7f7;
+  border-left: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+body.geomap #controls h2 {
+  margin-top: 0;
+}
+
+body.geomap .btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem 0;
+  background: #3498db;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+body.geomap .btn:hover {
+  background: #2980b9;
+}
+
+body.geomap #flow-count {
+  font-size: 1.2rem;
+  margin: 0.5rem 0;
+}
+
+body.geomap pre {
+  background: #ecf0f1;
+  padding: 0.5rem;
+  overflow-x: auto;
 }

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
   </head>
+
   <body>
     <nav>
       <h2>NetFlow Monitor</h2>
@@ -14,11 +15,22 @@
       <a href="/performance">Performance Metrics</a>
       <a href="/behavior">Behavioral Analytics</a>
       <a href="/temporal">Temporal Analysis</a>
-      <a href="ml-predictions">ML Anomaly Check</a>
+      <a href="/ml-predictions">ML Anomaly Check</a>
+      <a href="/geomap">Geo-IP Map</a>
     </nav>
 
     <main>
       <h1>Live NetFlow Monitoring</h1>
+
+      <!-- Plot Mode Switcher -->
+      <div id="plot-controls" style="margin:16px 0; text-align:center;">
+        <button id="btn-general"   type="button">General</button>
+        <button id="btn-direction" type="button">By Direction</button>
+        <button id="btn-interface" type="button">By Interface</button>
+      </div>
+
+      <!-- Trace toggles will be injected here -->
+      <div id="trace-toggles" style="margin:8px 0; text-align:center;"></div>
 
       <div class="card">
         <h3>In Bytes Over Time</h3>
@@ -26,13 +38,13 @@
       </div>
 
       <div class="card">
-        <h3>In Packets Over Time</h3>
-        <div id="packetsChart"></div>
+        <h3>Avg Throughput (bps)</h3>
+        <div id="throughputChart"></div>
       </div>
 
       <div class="card">
-        <h3>Avg Throughput (bps)</h3>
-        <div id="throughputChart"></div>
+        <h3>In Packets Over Time</h3>
+        <div id="packetsChart"></div>
       </div>
 
       <div class="card">
@@ -46,19 +58,13 @@
       </div>
 
       <div class="card">
-        <h3> Latest Flows</h3>
+        <h3>Latest Flows</h3>
         <table>
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Src IP</th>
-              <th>Dst IP</th>
-              <th>Src Port</th>
-              <th>Dst Port</th>
-              <th>Protocol</th>
-              <th>TCP Flags</th>
-              <th>Bytes</th>
-              <th>Packets</th>
+              <th>Time</th><th>Src IP</th><th>Dst IP</th>
+              <th>Src Port</th><th>Dst Port</th><th>Protocol</th>
+              <th>TCP Flags</th><th>Bytes</th><th>Packets</th>
               <th>Flow Duration (ms)</th>
             </tr>
           </thead>
@@ -67,6 +73,7 @@
       </div>
     </main>
 
+    <!-- JavaScript for dynamic chart and table rendering -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </body>
 </html>
