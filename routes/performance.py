@@ -1,14 +1,12 @@
 from flask import Blueprint, render_template
-import psycopg2
 import numpy as np
+from utils.db import get_conn
 
 performance_bp = Blueprint('performance', __name__)
 
 @performance_bp.route("/performance")
 def performance():
-    conn = psycopg2.connect(
-        dbname="network_db", user="postgres", password="postgres", host="localhost", port="5432"
-    )
+    conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
         SELECT time_first, in_bytes, in_pkts, flow_duration_ms, tcp_flags

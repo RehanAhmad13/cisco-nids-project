@@ -10,7 +10,6 @@ __pycache__/
 *.pkl
 *.json
 *.zip
-*.csv
-*.pkl
-*.json
-*.zip
+
+# Environment files
+.env

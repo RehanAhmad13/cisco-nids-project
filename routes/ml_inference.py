@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from flask import Blueprint, jsonify, render_template
-from sqlalchemy import create_engine
+from utils.db import get_engine
 import xgboost as xgb
 import sys
 import socket
@@ -28,8 +28,7 @@ model = xgb.Booster()
 model.load_model(MODEL_PATH)
 
 # === Connect to TimescaleDB ===
-TSDB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/network_db"
-engine = create_engine(TSDB_URL)
+engine = get_engine()
 
 # === List of features expected ===
 FEATURES = [

@@ -7,23 +7,25 @@ from typing import List, Tuple, Dict
 import pandas as pd
 import pytz
 from netmiko import ConnectHandler
-from sqlalchemy import create_engine
+from utils.db import get_engine
 
 # ======================================
 # Configuration
 # ======================================
 DEVICE = {
     'device_type': 'cisco_ios',
-    'host': '192.168.10.14',
-    'username': 'usama',
-    'password': 'usama',
+    'host': os.environ.get('DEVICE_HOST'),
+    'username': os.environ.get('DEVICE_USERNAME'),
+    'password': os.environ.get('DEVICE_PASSWORD'),
 }
 
 MAIN_MONITOR = "FLOW-MONITOR"
 FLAG_MONITOR = "dat_Gi1_885011376"
 
-TSDB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/network_db"
-TSDB_ENGINE = create_engine(TSDB_URL)
+TSDB_URL = os.environ.get("TSDB_URL")
+if not TSDB_URL:
+    raise RuntimeError("TSDB_URL environment variable not set")
+TSDB_ENGINE = get_engine()
 CSV_FILE = "flows_log.csv"
 
 # ======================================

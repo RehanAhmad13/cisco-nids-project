@@ -1,14 +1,12 @@
 from flask import Blueprint, render_template
-import psycopg2
 import pandas as pd
+from utils.db import get_conn
 
 behavior_bp = Blueprint('behavior', __name__)
 
 @behavior_bp.route("/behavior")
 def behavior():
-    conn = psycopg2.connect(
-        dbname="network_db", user="postgres", password="postgres", host="localhost", port="5432"
-    )
+    conn = get_conn()
     query = """
         SELECT ipv4_src_addr, ipv4_dst_addr, l4_src_port, l4_dst_port, protocol, time_first
         FROM network_flows

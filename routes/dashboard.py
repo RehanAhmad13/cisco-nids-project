@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, jsonify
 import pandas as pd
 import pytz
-from sqlalchemy import create_engine
+from utils.db import get_engine
 
 dashboard_bp = Blueprint('dashboard', __name__)
-engine = create_engine("postgresql+psycopg2://postgres:postgres@localhost:5432/network_db")
+engine = get_engine()
 
 # -------------------
 # Renders the main dashboard page

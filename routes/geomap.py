@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify
 import geoip2.database
 import pandas as pd
 import os
-from sqlalchemy import create_engine
+from utils.db import get_engine
 
 geomap_bp = Blueprint('geomap', __name__)
 
@@ -12,7 +12,7 @@ def geomap_page():
     return render_template('geomap.html')
 
 # --- invoking database engine ---
-engine = create_engine("postgresql+psycopg2://postgres:postgres@localhost:5432/network_db")
+engine = get_engine()
 
 # --- invoking GeoIP reader ---
 reader = geoip2.database.Reader(os.path.join('data', 'GeoLite2-City.mmdb'))

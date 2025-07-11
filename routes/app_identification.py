@@ -2,11 +2,10 @@
 
 from flask import Blueprint, render_template, jsonify, current_app
 import pandas as pd
-from sqlalchemy import create_engine
+from utils.db import get_engine
 
 app_ident = Blueprint('app_ident', __name__)
-TSDB_URL  = "postgresql+psycopg2://postgres:postgres@localhost:5432/network_db"
-engine    = create_engine(TSDB_URL)
+engine = get_engine()
 
 @app_ident.route("/traffic_by_application")
 def traffic_by_application():
