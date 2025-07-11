@@ -3,10 +3,13 @@
 from flask import Blueprint, render_template, jsonify, current_app
 import pandas as pd
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from config import get_database_url
+
+load_dotenv()
 
 app_ident = Blueprint('app_ident', __name__)
-TSDB_URL  = "postgresql+psycopg2://[REDACTED]:[REDACTED]@localhost:5432/network_db"
-engine    = create_engine(TSDB_URL)
+engine = create_engine(get_database_url())
 
 @app_ident.route("/traffic_by_application")
 def traffic_by_application():

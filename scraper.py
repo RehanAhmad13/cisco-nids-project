@@ -8,21 +8,25 @@ import pandas as pd
 import pytz
 from netmiko import ConnectHandler
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+from config import get_device_config, get_database_url, get_monitor_config, validate_config
+
+# Load environment variables
+load_dotenv()
 
 # ======================================
 # Configuration
 # ======================================
-DEVICE = {
-    'device_type': 'cisco_ios',
-    'host': '[REDACTED]',
-    'username': '[REDACTED]',
-    'password': '[REDACTED]',
-}
+# Validate configuration on startup
+validate_config()
 
-MAIN_MONITOR = "FLOW-MONITOR"
-FLAG_MONITOR = "dat_Gi1_885011376"
+DEVICE = get_device_config()
+MONITOR_CONFIG = get_monitor_config()
+MAIN_MONITOR = MONITOR_CONFIG['main_monitor']
+FLAG_MONITOR = MONITOR_CONFIG['flag_monitor']
 
-TSDB_URL = "postgresql+psycopg2://[REDACTED]:[REDACTED]@localhost:5432/network_db"
+TSDB_URL = get_database_url()
 TSDB_ENGINE = create_engine(TSDB_URL)
 CSV_FILE = "flows_log.csv"
 

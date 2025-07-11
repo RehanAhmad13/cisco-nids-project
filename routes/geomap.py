@@ -3,6 +3,10 @@ import geoip2.database
 import pandas as pd
 import os
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from config import get_database_url
+
+load_dotenv()
 
 geomap_bp = Blueprint('geomap', __name__)
 
@@ -12,7 +16,7 @@ def geomap_page():
     return render_template('geomap.html')
 
 # --- invoking database engine ---
-engine = create_engine("postgresql+psycopg2://[REDACTED]:[REDACTED]@localhost:5432/network_db")
+engine = create_engine(get_database_url())
 
 # --- invoking GeoIP reader ---
 reader = geoip2.database.Reader(os.path.join('data', 'GeoLite2-City.mmdb'))

@@ -8,8 +8,12 @@ import xgboost as xgb
 import sys
 import socket
 import struct
+from dotenv import load_dotenv
+from config import get_database_url
 
 from utils.encoders import LabelEncoderExt
+
+load_dotenv()
 
 sys.modules['__main__'].LabelEncoderExt = LabelEncoderExt
 
@@ -28,8 +32,7 @@ model = xgb.Booster()
 model.load_model(MODEL_PATH)
 
 # === Connect to TimescaleDB ===
-TSDB_URL = "postgresql+psycopg2://[REDACTED]:[REDACTED]@localhost:5432/network_db"
-engine = create_engine(TSDB_URL)
+engine = create_engine(get_database_url())
 
 # === List of features expected ===
 FEATURES = [

@@ -2,9 +2,13 @@ from flask import Blueprint, render_template, jsonify
 import pandas as pd
 import pytz
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from config import get_database_url
+
+load_dotenv()
 
 dashboard_bp = Blueprint('dashboard', __name__)
-engine = create_engine("postgresql+psycopg2://[REDACTED]:[REDACTED]@localhost:5432/network_db")
+engine = create_engine(get_database_url())
 
 # -------------------
 # Renders the main dashboard page
