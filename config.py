@@ -5,7 +5,7 @@ def get_device_config() -> Dict[str, Any]:
     """Get network device configuration from environment variables."""
     return {
         'device_type': os.getenv('DEVICE_TYPE', 'cisco_ios'),
-        'host': os.getenv('DEVICE_HOST', '192.168.10.14'),
+        'host': os.getenv('DEVICE_HOST'),
         'username': os.getenv('DEVICE_USERNAME'),
         'password': os.getenv('DEVICE_PASSWORD'),
     }
@@ -30,7 +30,7 @@ def get_monitor_config() -> Dict[str, str]:
 def validate_config():
     """Validate that required environment variables are set."""
     required_vars = [
-        'DEVICE_USERNAME', 'DEVICE_PASSWORD', 'DB_PASSWORD'
+        'DEVICE_USERNAME', 'DEVICE_PASSWORD', 'DEVICE_HOST', 'DB_PASSWORD'
     ]
     
     missing_vars = []
